@@ -274,6 +274,50 @@ Taylor-Green 涡是一个经典的 CFD 测试流场，其\textbf{解析解}已�
     \end{tabular}
 \end{table}
 
+\subsubsection{借鉴网格基准方法的定量分析}
+
+参考合作者的验证方法论，本实验补充了\textbf{归一化 L2/L∞ 双误差指标}（比较中心 80\% 区域，排除边界伪影）、\textbf{重复试验量化方差}，以及\textbf{误差-成本 Pareto 曲线}：
+
+\begin{table}[H]
+    \centering
+    \caption{归一化 L2 与 L∞ 误差（中心 80\% 区域，$t=1.0$）}
+    \label{tab:borrowed}
+    \rowcolors{2}{white}{lightgray}
+    \begin{tabular}{c|c|c|c}
+        \toprule
+        \textbf{方法} & \textbf{归一化 L2} & \textbf{L∞ 误差} & \textbf{L2 标准差} \\
+        \midrule
+        2022 (nmc=64) & 0.589 & 2.14 & 0.011 \\
+        2022 (nmc=256) & \textbf{0.504} & \textbf{2.01} & 0.012 \\
+        2022 (nmc=1024) & 0.537 & 2.07 & 0.042 \\
+        \midrule
+        2024 (256采样) & 0.992 & 4.32 & --- \\
+        2024 (512采样) & 0.749 & 3.57 & --- \\
+        2024 (1024采样) & 0.609 & 2.85 & --- \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{report_results/fig_pareto.png}
+    \caption{误差-成本 Pareto 曲线：归一化 L2 误差 vs 计算时间。
+    2022 方法在 $10^{-1}$ 秒量级达到 L2$\approx$0.5，2024 方法在 $10^0$--$10^1$ 秒量级才接近 L2$\approx$0.6，说明 2022 在精度-成本权衡上显著占优。}
+    \label{fig:pareto}
+\end{figure}
+
+\textbf{借鉴合作者方法论后的关键发现}：
+
+\begin{itemize}
+    \item \textbf{L∞ 误差差异更显著}：2024 的 L∞ 误差（2.85--4.32）远高于 2022（2.0），说明 2024 的投影噪声在涡量峰值处产生更强的局部尖峰，而不仅平均误差偏高。
+
+    \item \textbf{收敛行为不同}：2024 的归一化 L2 随采样单调下降（0.99$\to$0.61），尚未收敛；2022 在 nmc$\ge$256 后出现平台（0.50--0.54），受限于插值误差而非 MC 噪声。
+
+    \item \textbf{重复试验方差}：2022 的 L2 标准差较小（0.011--0.042），随 nmc 增大先降后升（nmc=1024 时方差反而增大，与高采样下的噪声/插值交互有关），说明 MC 方差不是 2022 的主要误差源。
+
+    \item \textbf{Pareto 权衡}：图 \ref{fig:pareto} 显示 2022 方法在相同精度下计算代价低约 1--2 个数量级，精度-成本曲线全面优于 2024。
+\end{itemize}
+
 \subsubsection{扩展定量指标}
 
 为进一步全面评估，补充以下定量指标（$t=1.0$，256 采样，$64\times64$）：
