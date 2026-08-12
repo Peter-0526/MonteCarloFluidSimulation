@@ -318,6 +318,53 @@ Taylor-Green 涡是一个经典的 CFD 测试流场，其\textbf{解析解}已�
     \item \textbf{Pareto 权衡}：图 \ref{fig:pareto} 显示 2022 方法在相同精度下计算代价低约 1--2 个数量级，精度-成本曲线全面优于 2024。
 \end{itemize}
 
+\subsubsection{GPU 加速后的性能对比}
+
+对两种方法分别进行 GPU 加速后重新对比性能：
+
+\begin{itemize}
+    \item \textbf{2022 涡量法加速}：将 Biot-Savart 与双线性插值写成\textbf{融合 CUDA kernel}（CuPy RawKernel），消除中间数组与 kernel 启动开销，单步耗时降低约 5--16 倍（与网格规模相关）。
+    \item \textbf{2024 速度法加速}：启用 \textbf{VPL 路径缓存}并将边界路径长度 $L_{\text{path}}$ 从 4 降至 2（该场景无固体边界，边界路径项贡献为零），单步耗时降低约 2.2 倍，精度完全不变。
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{report_results/fig_perf_bar.png}
+    \caption{单步耗时柱状图（$64\times64$，256 采样）：2022 加速后 0.33 ms/步，2024 加速后 112 ms/步。2022 快约 341 倍。}
+    \label{fig:perf_bar}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{report_results/fig_error_curves.png}
+    \caption{加速后两种方法的误差-采样曲线（归一化 L2，中心 80\%）。}
+    \label{fig:error_curves}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{report_results/fig_pareto_accel.png}
+    \caption{加速后的误差-成本 Pareto 曲线。2022 方法（融合 kernel 加速）在远低于 2024 的计算成本下达到更低误差。}
+    \label{fig:pareto_accel}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{GPU 加速前后性能对比（$64\times64$，256 采样）}
+    \label{tab:accel}
+    \rowcolors{2}{white}{lightgray}
+    \begin{tabular}{c|c|c|c|c}
+        \toprule
+        \textbf{方法} & \textbf{加速前 (ms/步)} & \textbf{加速后 (ms/步)} & \textbf{加速比} & \textbf{归一化 L2} \\
+        \midrule
+        2022 涡量法 & 1.67 & \textbf{0.33} & 5.1$\times$ & 0.504 \\
+        2024 速度法 & 248 & \textbf{112} & 2.2$\times$ & 0.992 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+加速后的性能差距进一步扩大：2022 方法在单步耗时上比 2024 快约 \textbf{341 倍}（0.33 ms vs 112 ms），且误差更低（L2 0.504 vs 0.992）。这源于 Biot-Savart 直接积分的高并行度与低内存开销，而 2024 的 WoB 投影需要进行逐查询点的光线追踪路径积分。
+
 \subsubsection{扩展定量指标}
 
 为进一步全面评估，补充以下定量指标（$t=1.0$，256 采样，$64\times64$）：
