@@ -76,7 +76,7 @@ python study_nmc3d.py --nx 32 --nmc_list "32,64,128,256,512" --repeats 3 --total
 - 统计误差已被有效控制，误差以系统误差为主；
 - 系统误差可能来源于时间/空间离散、边界处理或参考解匹配问题；
 
-## 运行[compare_burgers3d.py](/2022_Simulation/mc_fluid_step3_py/compare_burgers3d.py)
+## 运行[compare_tg3d.py](/2022_Simulation/mc_fluid_step3_py/compare_tg3d.py)
 
 1. 运行参数
 
@@ -86,8 +86,6 @@ python study_nmc3d.py --nx 32 --nmc_list "32,64,128,256,512" --repeats 3 --total
 --total_time          总模拟时长  1.0 
 --nmc                 MC 速度采样数  64 
 --nu                  运动粘性系数  0.05 
---a                   Burgers 涡拉伸参数  1.0 
---Gamma               环量强度  1.0 
 --L                   域半边长（[-L,L]³）  1.0 
 --output_dir          输出目录  output 
 --fps                 动画帧率  10 
@@ -96,18 +94,32 @@ python study_nmc3d.py --nx 32 --nmc_list "32,64,128,256,512" --repeats 3 --total
 2. 运行示例
 
 ```bash
-python compare_burgers3d.py --nx 32 --ny 32 --nz 32 --nmc 128 --a 1.0 --Gamma 1.0 --nu
- 0.01 --total_time 2.0
+python compare_tg3d.py --nx 32 --dt 0.02 --nmc 128 --total_time 1.0 --nu 0.01 --fps 8
 ```
 
 3. 运行结果
 
-[模拟动画](/2022_Simulation/mc_fluid_step3_py/output/step3_burgers_evolution.gif)
+[演化动画](/2022_Simulation/mc_fluid_step3_py/output/step3_tg_evolution.gif)
 
-[模拟数据](/2022_Simulation/mc_fluid_step3_py/output/step3_burgers_error_curve.png)
+[演化数据](/2022_Simulation/mc_fluid_step3_py/output/step3_tg_error_curve.png)
 
 4. 结果分析
 
-- 当前 MC 模拟器在 Burgers 涡上的误差主要源于数值耗散（网格插值）和速度方差，而非物理粘性破坏稳态。即使初始场与解析解完全一致，粗网格和有限采样仍无法维系拉伸-扩散平衡，导致涡量快速衰减。
+- 初始误差为 0，误差随时间稳定增长而非爆炸，说明 MC 求解器能正确模拟 TG 涡旋的物理演化。
+- 精度不足：在 32³ + nmc=128 下，L2 误差超过 50%，无法用于定量预测，仅适合定性观察或教学验证。
+- 改进方向：提升网格至 64³ 或 128³、增加 nmc≥256、引入重要性采样/控制变量，可将 1 秒时的 L2 误差降至 10% 以内。
 
-- 这意味着单纯提高 nmc 的收益有限，核心需要提高网格分辨率并配合方差缩减技术，才能使误差降至可接受范围（如 <5%）
+## 运行[study_dt3d.py](/2022_Simulation/mc_fluid_step3_py/study_dt3d.py)
+
+比较误差与运行时间的关系
+
+运行示例
+
+```bash
+python study_dt3d.py --nx 32 --total_time 0.5 --nmc 128 --nu 0.01 --L 2.0 --dt_list "0.01,0.02,0.04,0.08,0.16"
+```
+
+运行结果
+[运行图表](/2022_Simulation/mc_fluid_step3_py/output/step3_dt_error_curve.png)
+
+[运行数据](/2022_Simulation/mc_fluid_step3_py/output/step3_dt_study.txt)

@@ -26,7 +26,12 @@ wosx/
 *.aux
 *.out
 *.toc
+*.fls
+*.xdv
+*.fdb_latexmk
 *.synctex.gz
 
 # NumPy cache
 __pycache__/
+
+*.mp4

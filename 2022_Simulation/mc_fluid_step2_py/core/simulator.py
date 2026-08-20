@@ -1,7 +1,9 @@
+# core/simulator.py
 from .grid import Grid
 from .geometry import Geometry
 from .wos import WoS_solver
 from .types import Vec2, RNG
+from .biot_savart import BiotSavart, estimate_velocity_batch   # 导入批量函数
 from typing import Optional
 import numpy as np
 
@@ -51,30 +53,60 @@ class Simulator:
         if self.use_wos:
             self.wos_solver.grid = prev
 
-        for j in range(self.ny):
-            for i in range(self.nx):
-                x = prev.grid_pos(i,j)
-                if not self.geometry.inside_domain(x):
-                    nxt.set_vort(i,j,0.0)
-                    continue
-                # 估计速度
-                if self.use_wos:
+        if self.use_wos:
+            # 有障碍物时，沿用原来的逐点方法（WoS_solver 本身可能已优化）
+            for j in range(self.ny):
+                for i in range(self.nx):
+                    x = prev.grid_pos(i,j)
+                    if not self.geometry.inside_domain(x):
+                        nxt.set_vort(i,j,0.0)
+                        continue
                     v = self.wos_solver.velocity_at(x, self.nmc)
-                else:
-                    # Phase 1 的回退（无边界时使用 BiotSavart）
-                    from .biot_savart import BiotSavart
-                    v = BiotSavart.estimate_velocity(prev, x, self.nmc, self.rng)
-                # 半拉格朗日后向追踪
-                xb = x - v * self.dt
-                # 若回溯点落在域外，则取最近域内点（防止涡量泄漏）
-                if not self.geometry.inside_domain(xb):
-                    xb = self.geometry.closest_point(xb)
-                    # 为避免进入障碍物，稍微推进内点
-                    inward = xb - x
-                    if inward.norm() > 1e-8:
-                        xb = xb + inward * 1e-4
-                w = prev.get_vort(xb)
-                nxt.set_vort(i,j,w)
+                    # 半拉格朗日回溯
+                    xb = x - v * self.dt
+                    if not self.geometry.inside_domain(xb):
+                        xb = self.geometry.closest_point(xb)
+                        inward = xb - x
+                        if inward.norm() > 1e-8:
+                            xb = xb + inward * 1e-4
+                    w = prev.get_vort(xb)
+                    nxt.set_vort(i,j,w)
+        else:
+            # 无障碍物时，使用批量并行速度估计
+            # 1) 收集所有网格点的坐标（展开成一维数组）
+            xs = np.empty(self.nx * self.ny)
+            ys = np.empty(self.nx * self.ny)
+            idx = 0
+            for j in range(self.ny):
+                for i in range(self.nx):
+                    p = prev.grid_pos(i,j)
+                    xs[idx] = p.x
+                    ys[idx] = p.y
+                    idx += 1
+            # 2) 批量估计速度
+            vx, vy = estimate_velocity_batch(prev, xs, ys, self.nmc)
+
+            # 3) 逐点进行半拉格朗日回溯（由于没有障碍物，inside_domain 通常恒为 True）
+            idx = 0
+            for j in range(self.ny):
+                for i in range(self.nx):
+                    x = prev.grid_pos(i,j)
+                    if not self.geometry.inside_domain(x):
+                        nxt.set_vort(i,j,0.0)
+                        idx += 1
+                        continue
+                    v = Vec2(vx[idx], vy[idx])
+                    idx += 1
+                    # 半拉格朗日后向追踪
+                    xb = x - v * self.dt
+                    # 若回溯点落在域外，则取最近域内点（防止涡量泄漏）
+                    if not self.geometry.inside_domain(xb):
+                        xb = self.geometry.closest_point(xb)
+                        inward = xb - x
+                        if inward.norm() > 1e-8:
+                            xb = xb + inward * 1e-4
+                    w = prev.get_vort(xb)
+                    nxt.set_vort(i,j,w)
         self.cur = 1 - self.cur
 
     @property

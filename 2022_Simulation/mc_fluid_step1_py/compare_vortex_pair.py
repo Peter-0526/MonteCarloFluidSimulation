@@ -8,15 +8,20 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from core.types import Vec2
+from core.types import Vec2, RNG as CoreRNG
 from core.grid import Grid
 from core.biot_savart import BiotSavart
 import random as pyrandom
 
-class RNG:
-    def __init__(self): self.uni = pyrandom.uniform
+class RNG(CoreRNG):
+    def __init__(self):
+        self.uni = pyrandom.uniform
+
+    def uniform(self, a, b):
+        return self.uni(a, b)
+
     def uniform_in_box(self, xmin, xmax, ymin, ymax):
-        return Vec2(self.uni(xmin,xmax), self.uni(ymin,ymax))
+        return Vec2(self.uniform(xmin, xmax), self.uniform(ymin, ymax))
 
 class Sim2022:
     def __init__(self, nx, ny, dt, nmc):

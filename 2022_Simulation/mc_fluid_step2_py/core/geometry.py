@@ -67,3 +67,17 @@ class Geometry:
                 if (p - c).norm() < r - 1e-8:
                     return False
         return True
+
+    # core/geometry.py（添加方法）
+    def add_rectangle(self, center_x, center_y, width, height):
+        """添加一个轴对齐矩形障碍物"""
+        half_w = width / 2.0
+        half_h = height / 2.0
+        corners = [
+            Vec2(center_x - half_w, center_y - half_h),
+            Vec2(center_x + half_w, center_y - half_h),
+            Vec2(center_x + half_w, center_y + half_h),
+            Vec2(center_x - half_w, center_y + half_h),
+        ]
+        # 将矩形保存为多边形（障碍物列表）
+        self.obstacles.append(('polygon', corners))
