@@ -1,7 +1,22 @@
-# 核心依赖
+# ---- 核心依赖（所有阶段必需）----
 numpy>=1.21
 matplotlib>=3.5
-pillow>=9.0
+pillow>=9.0          # 由 matplotlib 的 PillowWriter 用于导出 GIF 动画
 
-# 可选加速（numba 编译可提升 50~200 倍）
+# ---- 加速库（必需）----
+# core/ 中的 Biot-Savart、涡量更新等热点函数均以 @njit / @njit(parallel=True) 实现，
+# 缺少 numba 将无法导入 core 模块。
 numba>=0.55
+
+# ---- 对比实验依赖 ----
+scipy>=1.7           # Phase 2/3 的网格参考解（scipy.sparse 求解 Poisson / 压力投影）
+psutil>=5.8          # 对比脚本中的内存（RSS）统计
+
+# ---- 可选依赖 ----
+# GPU 加速（仅 mc_fluid_step1_py/gpu_fluid_2022.py 使用，按本机 CUDA 版本选择其一）
+# cupy-cuda12x>=12.0
+# cupy-cuda11x>=11.0
+#
+# WoSX 库（仅 Phase 2 的 wosx_main.py / compare_mc_vs_grid.py 使用）：
+# 官方未发布到 PyPI，需从上游源码编译安装；安装后可用 test/test_wosx.py 自检环境。
+# wosx
