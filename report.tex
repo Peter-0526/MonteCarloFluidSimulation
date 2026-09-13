@@ -274,23 +274,71 @@ Taylor-Green 涡是一个经典的 CFD 测试流场，其\textbf{解析解}已�
     \end{tabular}
 \end{table}
 
-\subsubsection{扩展定量指标}
+\subsubsection{GPU 加速后的性能对比}
 
-为进一步全面评估，补充以下定量指标（$t=1.0$，256 采样，$64\times64$）：
+对两种方法分别进行 GPU 加速后重新对比性能：
+
+\begin{itemize}
+    \item \textbf{2022 涡量法加速}：将 Biot-Savart 与双线性插值写成\textbf{融合 CUDA kernel}（CuPy RawKernel），消除中间数组与 kernel 启动开销，单步耗时降低约 5--16 倍（与网格规模相关）。
+    \item \textbf{2024 速度法加速}：启用 \textbf{VPL 路径缓存}并将边界路径长度 $L_{\text{path}}$ 从 4 降至 2（该场景无固体边界，边界路径项贡献为零），单步耗时降低约 2.2 倍，精度完全不变。
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{report_results/fig_perf_bar.png}
+    \caption{单步耗时柱状图（$64\times64$，256 采样）：2022 加速后 0.33 ms/步，2024 加速后 112 ms/步。2022 快约 341 倍。}
+    \label{fig:perf_bar}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{report_results/fig_error_curves.png}
+    \caption{加速后两种方法的误差-采样曲线（归一化 L2，中心 80\%）。}
+    \label{fig:error_curves}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{report_results/fig_pareto_accel.png}
+    \caption{加速后的误差-成本 Pareto 曲线。2022 方法（融合 kernel 加速）在远低于 2024 的计算成本下达到更低误差。}
+    \label{fig:pareto_accel}
+\end{figure}
 
 \begin{table}[H]
     \centering
-    \caption{扩展定量指标对比}
+    \caption{GPU 加速前后性能对比（$64\times64$，256 采样）}
+    \label{tab:accel}
+    \rowcolors{2}{white}{lightgray}
+    \begin{tabular}{c|c|c|c|c}
+        \toprule
+        \textbf{方法} & \textbf{加速前 (ms/步)} & \textbf{加速后 (ms/步)} & \textbf{加速比} & \textbf{归一化 L2} \\
+        \midrule
+        2022 涡量法 & 1.67 & \textbf{0.33} & 5.1$\times$ & 0.504 \\
+        2024 速度法 & 248 & \textbf{112} & 2.2$\times$ & 0.992 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+加速后的性能差距进一步扩大：2022 方法在单步耗时上比 2024 快约 \textbf{341 倍}（0.33 ms vs 112 ms），且误差更低（L2 0.504 vs 0.992）。这源于 Biot-Savart 直接积分的高并行度与低内存开销，而 2024 的 WoB 投影需要进行逐查询点的光线追踪路径积分。
+
+\subsubsection{定量误差指标}
+
+进一步补充归一化误差指标（$t=1.0$，256 采样，$64\times64$，比较中心 80\% 区域排除边界伪影）：
+
+\begin{table}[H]
+    \centering
+    \caption{归一化 L2/L∞ 与扩展误差指标}
     \label{tab:extended_metrics}
     \rowcolors{2}{white}{lightgray}
     \begin{tabular}{c|c|c|c}
         \toprule
         \textbf{指标} & \textbf{2022 方法} & \textbf{2024 (256采样)} & \textbf{2024 (1024采样)} \\
         \midrule
-        相对 RMSE (RMSE/max$\omega_0$) & \textbf{0.100} & 0.238 & 0.181 \\
+        归一化 L2 误差 & \textbf{0.504} & 0.992 & 0.609 \\
+        L∞ 误差 & \textbf{2.01} & 4.32 & 2.85 \\
         动能相对误差 & \textbf{0.278} & 0.959 & 0.955 \\
-        绝对环量相对误差 & \textbf{0.158} & 0.188 & 0.361 \\
         最大涡量相对误差 & \textbf{0.019} & 0.949 & 0.317 \\
+        绝对环量相对误差 & 0.158 & 0.188 & 0.361 \\
         平均散度误差 & $\approx 0$ & 0.743 & 0.383 \\
         \bottomrule
     \end{tabular}
@@ -298,40 +346,68 @@ Taylor-Green 涡是一个经典的 CFD 测试流场，其\textbf{解析解}已�
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.95\textwidth]{report_results/fig_comprehensive_metrics.png}
-    \caption{扩展定量分析：左——主要误差指标对比；中——2024 误差随采样数的收敛（水平虚线为 2022 的平台值）；右——2022 误差随网格分辨率的收敛。}
+    \includegraphics[width=0.7\textwidth]{report_results/fig_comprehensive_metrics.png}
+    \caption{定量误差分析：左——主要误差指标对比；中——2024 误差随采样数的收敛（虚线为 2022 平台值）；右——2022 误差随网格分辨率的收敛。}
     \label{fig:comprehensive}
 \end{figure}
 
-扩展指标揭示的关键差异：
-
-\begin{itemize}
-    \item \textbf{最大涡量保持}：2022 的最大涡量相对误差仅 \textbf{0.019}，而 2024 高达 0.949（256 采样）和 0.317（1024 采样）。这是因为 2024 的 WoB 投影 MC 噪声直接污染速度场，经旋度算子放大后严重破坏了涡量峰值；2022 直接演化涡量，天然保持峰值。
-
-    \item \textbf{动能误差}：2022 的动能相对误差（0.278）远低于 2024（0.959）。2024 的投影噪声为速度场注入额外能量，导致动能偏高。
-
-    \item \textbf{绝对环量}：两者相近（0.158 vs 0.188），说明在涡量总量守恒上两者相当。
-
-    \item \textbf{收敛性}：2022 的误差随分辨率缓慢下降（res 32$\to$64$\to$128：0.61$\to$0.55$\to$0.49），空间精度约一阶，且在高分辨率受 MC 误差下限限制；2024 的误差随采样数下降（256$\to$1024：1.25$\to$0.95），但始终高于 2022 的平台值。
-\end{itemize}
-
 \subsubsection{误差来源分析}
 
-\begin{itemize}
-    \item \textbf{2022 涡量法}：误差随采样数 $N$ 增加先下降后\textbf{收敛于约 0.51 的平台}（$N$=64 $\to$ 0.63，256 $\to$ 0.51，1024 $\to$ 0.52）。这说明在采样充足后，误差主要由\textbf{半拉格朗日平流的插值耗散}决定，而非 Biot-Savart MC 积分（MC 误差 $\propto 1/\sqrt{N}$ 已被压缩到插值误差以下）。由于速度由积分重建且天然无散，\textbf{没有投影误差与散度误差}。
+综合以上指标，两种方法的误差来源与收敛行为差异显著：
 
-    \item \textbf{2024 速度法}：误差\textbf{持续随采样数下降}（256 $\to$ 1.25，512 $\to$ 1.06，1024 $\to$ 0.95），说明 \textbf{WoB 投影的 MC 噪声}是主要误差来源，尚未收敛到插值平台。同时存在非零的散度误差（平均 0.005--0.02），表明投影只能近似维持不可压缩性。
+\begin{itemize}
+    \item \textbf{2022 涡量法}：误差随采样数 $N$ 增加先下降后\textbf{收敛于约 0.51 的平台}（$N$=64 $\to$ 0.59，256 $\to$ 0.50，1024 $\to$ 0.54），受限于\textbf{半拉格朗日平流的插值耗散}而非 Biot-Savart MC 积分。重复试验的标准差仅 0.011--0.042，证明 MC 方差不是主要误差源。由于速度由积分重建且天然无散，\textbf{无投影误差与散度误差}，最大涡量保持出色（相对误差 0.019）。
+
+    \item \textbf{2024 速度法}：误差\textbf{随采样数持续下降}（256 $\to$ 0.99，512 $\to$ 0.75，1024 $\to$ 0.61），说明 \textbf{WoB 投影的 MC 噪声}是主要误差来源，尚未收敛。同时存在非零散度误差（0.383--0.743）与高动能误差（0.955--0.959），投影噪声为速度场注入额外能量并破坏涡量峰值（最大涡量误差 0.32--0.95）。
 
     \item \textbf{误差来源分解}：
     \begin{enumerate}[label=(\arabic*)]
-        \item \textbf{平流插值误差}（两者共有）：半拉格朗日追踪 + 双线性插值，随网格分辨率提高而下降；
+        \item \textbf{平流插值误差}（两者共有）：半拉格朗日追踪 + 双线性插值，随网格分辨率提高而下降（2022 空间精度约一阶）；
         \item \textbf{MC 积分误差}（两者共有）：Biot-Savart（2022）与 WoB 投影（2024）的采样噪声，$\propto 1/\sqrt{N}$；
-        \item \textbf{投影误差}（仅 2024）：WoB 边界积分的 MC 估计引入额外噪声，且不彻底（散度非零）；
-        \item \textbf{不可压缩性误差}（仅 2024）：投影后仍残存散度，进一步累积。
+        \item \textbf{投影与不可压缩性误差}（仅 2024）：WoB 边界积分的 MC 估计引入噪声且不彻底（散度非零）。
     \end{enumerate}
 
-    \item \textbf{结论}：在平滑流场上，2022 方法因\textbf{无需投影}而误差更低（0.51 vs 0.95--1.25）且更快（快约 40 倍）；2024 方法的优势在于复杂几何边界的处理能力（论文核心贡献），而非平滑流场的精度。
+    \item \textbf{结论}：误差的对比\textbf{依赖采样数}。2022 存在插值误差下限，2024 误差随采样持续下降，两者在精度-效率权衡上互补（详见下节扩展采样分析）。
 \end{itemize}
+
+\subsubsection{扩展采样分析}
+
+为进一步确认误差收敛行为，将采样数大幅扩展（$t=1.0$，$64\times64$，中心 80\% 区域）：
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{report_results/fig_high_samples.png}
+    \caption{扩展采样数的误差收敛曲线。2022 的归一化 L2 在 nmc$\ge$4096 后收敛于约 0.47 的平台（受插值耗散限制）；2024 的误差随采样数持续下降，在 4096 采样时达到 0.427，\textbf{反超 2022}。}
+    \label{fig:high_samples}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{扩展采样误差收敛（归一化 L2，中心 80\%）}
+    \label{tab:high_samples}
+    \rowcolors{2}{white}{lightgray}
+    \begin{tabular}{c|c|c}
+        \toprule
+        \textbf{采样数} & \textbf{2022 方法} & \textbf{2024 方法} \\
+        \midrule
+        256 & \textbf{0.565} & 0.992 \\
+        1024 & \textbf{0.625}$^{\dagger}$ & 0.609 \\
+        4096 & 0.480 & \textbf{0.427} \\
+        16384 & 0.475 & --- \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+\vspace{-0.3cm}\small $^{\dagger}$2022 在 nmc=1024 出现波动（L2 标准差 0.042），与高采样下的噪声-插值交互有关。
+
+扩展采样揭示了两个关键特征：
+
+\begin{itemize}
+    \item \textbf{2022 存在误差下限}：nmc 从 4096 增至 16384，L2 仅从 0.480 微降至 0.475。这表明 2022 的误差主导项是\textbf{半拉格朗日平流的插值耗散}，而非 Biot-Savart MC 积分——MC 采样到约 4096 后已不再有效降低误差。
+
+    \item \textbf{2024 误差持续收敛}：samples 从 256 增至 4096，L2 从 0.992 单调降至 0.427，误差主要由 WoB 投影的 MC 噪声主导，随采样数 $\propto 1/\sqrt{N}$ 下降。在\textbf{高采样下（$\ge$2048）2024 反超 2022}。
+\end{itemize}
+
+\textbf{综合结论}：两种方法各有最佳适用区间——2022 在低采样下精度更高、成本极低（快 341 倍）；2024 在\textbf{追求极限精度}时通过增加采样可超越 2022，但需更高计算成本。这体现了误差来源的差异：2022 的瓶颈是确定性插值耗散，2024 的瓶颈是随机 MC 投影噪声。
 
 \subsection{复杂边界的对比：2024 方法的优势}
 
@@ -344,16 +420,6 @@ Taylor-Green 涡是一个经典的 CFD 测试流场，其\textbf{解析解}已�
 
     \item \textbf{论文演示}：2024 论文 Fig.~1 展示了这一差异——在一对反向涡旋从两个障碍物之间流过时，速度法（本文方法）正确让烟雾穿过障碍物间隙，而涡量法（2022 方法）错误地让烟雾绕到障碍物外侧。其核心演示场景为 \texttt{hexagons.obj}（外六边形内含多个内六边形孔洞，构成上同调非单连通域），对应论文的 cohomology 场景。
 \end{itemize}
-
-本实验在降低分辨率（$64\times64$、$3\times10^4$ 采样）下运行了该 cohomology 场景的部分步（共 34 步，每步约 3 分钟），结果如图 \ref{fig:complex_boundary} 所示。可见 \textbf{2024 方法正确处理了复杂六边形边界}：涡旋材料（浓度场）沿障碍物间隙流动，速度场在孔洞间正确演化。
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.95\textwidth]{report_results/fig_complex_boundary_2024.png}
-    \caption{2024 速度法在 cohomology 场景（六边形孔洞边界）中的演化。
-    上行：浓度场（涡旋材料穿过障碍物间隙）；下行：速度场。该场景因每个时间步需对复杂边界做 VPL 路径积分，计算代价高（每步约 3 分钟）。}
-    \label{fig:complex_boundary}
-\end{figure}
 
 \textbf{数值演示：障碍物边界的处理。} 为直观对比复杂边界的处理能力，本实验分别测试了两种方法在\textbf{圆形障碍物}存在时的行为：
 
@@ -380,10 +446,10 @@ Taylor-Green 涡是一个经典的 CFD 测试流场，其\textbf{解析解}已�
 
 \begin{enumerate}[label=(\arabic*)]
     \item \textbf{两种方法均已实现}：2022 涡量法（自行 GPU 化 Biot-Savart）和 2024 速度法（编译论文官方代码，与论文完全一致）均稳定运行。
-    \item \textbf{定量精度}：在 $64\times64$、256 采样下，2022 方法的涡量 RMSE（0.514）低于 2024 方法（1.247）；2024 增至 1024 采样（0.947）仍高于 2022。
-    \item \textbf{计算效率}：相同分辨率与采样下，2022 方法比 2024 方法快约 \textbf{37 倍}（0.13 s vs 4.84 s，40 步）。
-    \item \textbf{误差来源}：2022 的误差受限于\textbf{半拉格朗日平流插值耗散}（平台约 0.51）；2024 的误差受限于\textbf{WoB 投影 MC 噪声}（随采样数持续下降）+ 投影散度误差。
-    \item \textbf{适用范围}：涡量法在平滑流场上精度与效率更优；速度法的优势在于复杂几何边界处理（2024 论文核心贡献）。
+    \item \textbf{采样数依赖的精度对比}：在低采样（256）下，2022 方法更优（L2 0.57 vs 0.99）；但\textbf{扩大采样后结论反转}——2022 误差存在插值下限（nmc$\ge$4096 后 L2 收敛于 0.47），而 2024 误差随采样持续下降（4096 采样时 L2 0.43，\textbf{反超 2022}）。
+    \item \textbf{计算效率}：GPU 加速后，2022 方法单步耗时（0.33 ms）比 2024 方法（112 ms）快约 \textbf{341 倍}；但 2024 可通过增加采样逼近或超越 2022 的精度，两者在\textbf{精度-效率权衡}上互补。
+    \item \textbf{误差来源}：2022 的误差受限于\textbf{半拉格朗日平流插值耗散}（平台约 0.47，MC 采样无法突破）；2024 的误差受限于\textbf{WoB 投影 MC 噪声}（随采样持续下降）+ 投影散度误差。
+    \item \textbf{适用范围}：涡量法在低采样下精度与效率更优；速度法在高采样下精度更高，且在复杂几何边界与调和场处理上具有优势（均匀来流、绕柱流动），2024 论文核心贡献。
 \end{enumerate}
 
 展望未来，以下方向值得探索：
